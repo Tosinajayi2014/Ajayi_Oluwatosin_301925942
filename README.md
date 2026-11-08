@@ -27,4 +27,4 @@ The Department of Computer Science, University of Abuja (UniAbuja), manages unde
 - GitHub Desktop, MySQL Workbench
 
 ## AI Use Declaration
-AI tools (Meta AI) were used as a learning aid for structuring documentation and reviewing SQL. All work was reviewed, tested and corrected by the student, who takes full responsibility for understanding it.
+AI tools (Meta AI) were used as a learning aid for structuring documentation and reviewing SQL code. All work was reviewed, tested and corrected by me and I takes full responsibility for understanding it.
