@@ -1,0 +1,202 @@
+// Portfolio 5: NoSQL & Advanced
+// Student: Ajayi Oluwatosin (301925942)
+// Database: MongoDB - unia_buja_nosql
+// Run in: mongosh  OR  MongoDB Compass > Shell
+
+// =====================================================
+// SETUP: Use Database
+// =====================================================
+use unia_buja_nosql;
+
+// =====================================================
+// PART A: STUDENT FEEDBACK - Flexible Schema
+// In MySQL this would need ALTER TABLE for every new field.
+// In MongoDB, each document can be different.
+// =====================================================
+
+// Drop old data for clean demo
+db.feedback.drop();
+
+// Feedback 1: Full fields
+db.feedback.insertOne({
+  _id: "feedback_001",
+  student_matric: "U21CS1001",
+  course_code: "CSC 301",
+  course_title: "Database Management Systems",
+  semester: "2024/2025 - 1st Semester",
+  lecturer: { name: "Dr. Musa", department: "Computer Science" },
+  rating: 5,
+  comment: "Dr. Musa explained DBMS very well, practical examples helped",
+  tags: ["clear", "helpful", "practical"],
+  created_at: new Date()
+});
+
+// Feedback 2: DIFFERENT fields - No ALTER TABLE needed!
+db.feedback.insertOne({
+  _id: "feedback_002",
+  student_matric: "U21CS1002",
+  course_code: "CSC 301",
+  rating: 3,
+  pros: "Good slides",
+  cons: "Too fast in week 7",
+  suggestions: ["More tutorials", "Slower pace"],
+  created_at: new Date()
+});
+
+// Feedback 3: With embedded replies (Embedding)
+db.feedback.insertOne({
+  _id: "feedback_003",
+  student_matric: "U21CS1003",
+  course_code: "CSC 302",
+  course_title: "Operating Systems",
+  rating: 4,
+  comment: "Good course but lab needs more computers",
+  replies: [
+    { by: "HOD", text: "Noted, we ordered 20 new PCs", date: new Date() },
+    { by: "Lecturer", text: "Thanks for feedback", date: new Date() }
+  ],
+  created_at: new Date()
+});
+
+// Feedback 4 & 5: For aggregation
+db.feedback.insertMany([
+  { student_matric: "U21CS1004", course_code: "CSC 301", rating: 5, comment: "Best course!", created_at: new Date() },
+  { student_matric: "U21CS1005", course_code: "CSC 302", rating: 2, comment: "Too much theory", created_at: new Date() }
+]);
+
+// =====================================================
+// PART B: QUERIES - Find Feedback
+// =====================================================
+
+// 1. All feedback for CSC 301
+db.feedback.find({ course_code: "CSC 301" });
+
+// 2. High rating only (4 and above)
+db.feedback.find({ rating: { $gte: 4 } });
+
+// 3. Feedback with tag "helpful"
+db.feedback.find({ tags: "helpful" });
+
+// 4. Search text in comment
+db.feedback.find({ comment: { $regex: "practical", $options: "i" } });
+
+// 5. Only show course_code + rating, hide _id
+db.feedback.find(
+  { course_code: "CSC 301" },
+  { _id: 0, course_code: 1, rating: 1, comment: 1 }
+);
+
+// =====================================================
+// PART C: UPDATE - Add field to ONE document only
+// In MySQL, adding a column affects ALL rows.
+// In MongoDB, update affects ONLY this document.
+// =====================================================
+db.feedback.updateOne(
+  { _id: "feedback_001" },
+  { $set: { is_anonymous: false, verified: true } }
+);
+
+// Add a reply to embedded array
+db.feedback.updateOne(
+  { _id: "feedback_001" },
+  { $push: { replies: { by: "HOD", text: "Thank you!", date: new Date() } } }
+);
+
+// =====================================================
+// PART D: ACTIVITY LOGS - High Volume, No Joins
+// MySQL would be slow for millions of logs.
+// MongoDB handles this easily.
+// =====================================================
+db.activity_logs.drop();
+
+db.activity_logs.insertMany([
+  { student_matric: "U21CS1001", action: "viewed_result", course_code: "CSC 301", ip: "192.168.1.10", timestamp: new Date() },
+  { student_matric: "U21CS1001", action: "downloaded_transcript", ip: "192.168.1.10", timestamp: new Date() },
+  { student_matric: "U21CS1002", action: "viewed_result", course_code: "CSC 301", ip: "192.168.1.11", timestamp: new Date() },
+  { student_matric: "U21CS1003", action: "login", ip: "192.168.1.12", timestamp: new Date() }
+]);
+
+// How many times did U21CS1001 view results?
+db.activity_logs.countDocuments({ student_matric: "U21CS1001", action: "viewed_result" });
+
+// =====================================================
+// PART E: NOTIFICATIONS - Unstructured, Temporary
+// =====================================================
+db.notifications.drop();
+
+db.notifications.insertMany([
+  { to_matric: "U21CS1001", type: "result_out", message: "Your CSC 301 result is out! Grade: A", is_read: false, created_at: new Date() },
+  { to_matric: "U21CS1002", type: "result_out", message: "Your CSC 301 result is out! Grade: B", is_read: false, created_at: new Date() },
+  { to_matric: "U21CS1001", type: "announcement", message: "Exam timetable for 2nd semester is out", is_read: false, created_at: new Date() }
+]);
+
+// Mark as read
+db.notifications.updateMany(
+  { to_matric: "U21CS1001" },
+  { $set: { is_read: true } }
+);
+
+// =====================================================
+// PART F: INDEXES - Same idea as Portfolio 2
+// =====================================================
+// Speed up: "Show feedback for a course, sorted by rating"
+db.feedback.createIndex({ course_code: 1, rating: -1 });
+
+// Speed up: "Show logs for a student, newest first"
+db.activity_logs.createIndex({ student_matric: 1, timestamp: -1 });
+
+// Speed up: Text search in comments
+db.feedback.createIndex({ comment: "text" });
+db.feedback.find({ $text: { $search: "practical helpful" } });
+
+// Show indexes
+db.feedback.getIndexes();
+
+// =====================================================
+// PART G: AGGREGATION - Like GROUP BY in SQL
+// Average rating per course
+// =====================================================
+db.feedback.aggregate([
+  { $group: {
+      _id: "$course_code",
+      avg_rating: { $avg: "$rating" },
+      total_feedback: { $sum: 1 },
+      max_rating: { $max: "$rating" },
+      min_rating: { $min: "$rating" }
+  }},
+  { $sort: { avg_rating: -1 } }
+]);
+
+// Count actions per type (for HOD dashboard)
+db.activity_logs.aggregate([
+  { $group: { _id: "$action", count: { $sum: 1 } } },
+  { $sort: { count: -1 } }
+]);
+
+// =====================================================
+// PART H: HYBRID DESIGN - How MySQL + MongoDB Work Together
+// =====================================================
+// MySQL (unia_buja_cs):
+//   Student (student_id, matric_number, name) <- Source of truth
+//   Result (enrollment_id, grade) <- Must be ACID
+//
+// MongoDB (unia_buja_nosql):
+//   feedback.student_matric -> REFERENCES MySQL Student.matric_number
+//   activity_logs.student_matric -> REFERENCES MySQL Student.matric_number
+//
+// When app shows a student dashboard:
+//   1. Query MySQL: SELECT grade FROM Result WHERE matric = 'U21CS1001'
+//   2. Query MongoDB: db.feedback.find({ student_matric: 'U21CS1001' })
+//   3. Combine in app code and show one page.
+//
+// NEVER duplicate grades in MongoDB. Grades live ONLY in MySQL.
+// NEVER duplicate feedback in MySQL. Feedback lives ONLY in MongoDB.
+//
+// =====================================================
+// PART I: DELETE & CLEANUP
+// =====================================================
+// Delete one notification
+// db.notifications.deleteOne({ to_matric: "U21CS1001", type: "announcement" });
+
+// Delete old logs (older than 1 year) - TTL Index would auto-delete:
+// db.activity_logs.createIndex({ timestamp: 1 }, { expireAfterSeconds: 31536000 });
